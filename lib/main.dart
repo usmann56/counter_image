@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const MyApp());
@@ -54,12 +55,32 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
       parent: _animationController,
       curve: Curves.easeInOut,
     );
+    // Load saved state
+    _loadState();
     // Start continuous animation
     _startContinuousAnimation();
   }
 
   void _startContinuousAnimation() {
     _animationController.repeat(reverse: true);
+  }
+
+  // Load saved state from SharedPreferences
+  Future<void> _loadState() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _counter = prefs.getInt('counter') ?? 0;
+      _isFirstImage = prefs.getBool('isFirstImage') ?? true;
+      _isDarkMode = prefs.getBool('isDarkMode') ?? false;
+    });
+  }
+
+  // Save current state to SharedPreferences
+  Future<void> _saveState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('counter', _counter);
+    await prefs.setBool('isFirstImage', _isFirstImage);
+    await prefs.setBool('isDarkMode', _isDarkMode);
   }
 
   @override
@@ -72,17 +93,66 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
     setState(() {
       _counter++;
     });
+    _saveState(); // Save state after counter change
   }
 
   void _toggleImage() {
     setState(() {
       _isFirstImage = !_isFirstImage;
     });
+    _saveState(); // Save state after image change
   }
 
   void _toggleTheme() {
     setState(() {
       _isDarkMode = !_isDarkMode;
+    });
+    _saveState(); // Save state after theme change
+  }
+
+  // Reset functionality with confirmation dialog
+  Future<void> _showResetDialog() async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Reset Application'),
+          content: const Text(
+            'Are you sure you want to reset the application? This will clear the counter, reset the image, and remove all saved data. This action cannot be undone.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text(
+                'Reset',
+                style: TextStyle(color: Colors.red),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _resetApplication();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Reset all state and clear SharedPreferences
+  Future<void> _resetApplication() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear(); // Clear all stored data
+    
+    setState(() {
+      _counter = 0;
+      _isFirstImage = true;
+      _isDarkMode = false;
     });
   }
 
@@ -152,6 +222,19 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
               ElevatedButton(
                 onPressed: _toggleTheme,
                 child: Text(_isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: _showResetDialog,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+                child: const Text(
+                  'Reset',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
